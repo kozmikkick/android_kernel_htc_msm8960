@@ -1177,6 +1177,10 @@ static struct pvs_table * __init select_freq_plan(u32 pte_efuse_phys,
 	/* Select frequency tables. */
 	bin_idx = get_speed_bin(pte_efuse_val);
 	tbl_idx = get_pvs_bin(pte_efuse_val);
+#ifdef CONFIG_KOZMIK_OVERCLOCKING
+	bin_idx = 3;
+	tbl_idx = 1;
+#endif
 
 	return &pvs_tables[bin_idx][tbl_idx];
 }
