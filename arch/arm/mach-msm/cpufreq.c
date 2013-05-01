@@ -32,6 +32,8 @@
 
 #include "acpuclock.h"
 
+#include <mach/msm-config.h>
+
 struct cpufreq_work_struct {
 	struct work_struct work;
 	struct cpufreq_policy *policy;
@@ -307,7 +309,7 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 		cur_freq = table[index].frequency;
 	}
 
-	policy->cur = cur_freq;
+	policy->cur = CPU_INITIAL_FREQ_MAX;
 
 	policy->cpuinfo.transition_latency =
 		acpuclk_get_switch_time() * NSEC_PER_USEC;
