@@ -6,5 +6,8 @@ obj-$(CONFIG_MACH_VILLE) += board-ville-audio.o
 obj-$(CONFIG_MACH_VILLE) += board-ville-pmic.o
 obj-$(CONFIG_MACH_VILLE) += board-ville-keypad.o
 obj-$(CONFIG_MACH_VILLE) += board-ville-gpu.o
+ifeq ($(CONFIG_MSM_CAMERA),y)
+obj-$(CONFIG_MACH_VILLE) += board-ville-camera.o
+endif
 obj-$(CONFIG_MACH_VILLE) += display/
 CFLAGS_board-ville-display.o += -Idrivers/video
