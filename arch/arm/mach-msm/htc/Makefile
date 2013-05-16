@@ -14,6 +14,7 @@ obj-$(CONFIG_MSM_NATIVE_RESTART) += htc_restart_handler.o
 obj-$(CONFIG_HTC_BATT_CORE) += htc_battery_core.o
 obj-$(CONFIG_HTC_BATT_8960) += htc_battery_8960.o htc_battery_cell.o
 
+obj-$(CONFIG_MSM_CAMERA) += htc_awb_cal.o
 obj-$(CONFIG_HTC_PWRSINK) += htc_pwrsink.o
 obj-$(CONFIG_HTC_HEADSET_MGR) += htc_headset_mgr.o
 obj-$(CONFIG_HTC_HEADSET_PMIC) += htc_headset_pmic.o
