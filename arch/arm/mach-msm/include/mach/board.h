@@ -61,8 +61,28 @@ struct msm_camera_device_platform_data {
 	struct msm_camera_io_ext ioext;
 	struct msm_camera_io_clk ioclk;
 	uint8_t csid_core;
+	uint8_t is_csiphy;
+	uint8_t is_csic;
+	uint8_t is_csid;
+	uint8_t is_ispif;
 	uint8_t is_vpe;
 	struct msm_bus_scale_pdata *cam_bus_scale_table;
+#if 1	
+	int (*camera_csi_on) (void);
+	int (*camera_csi_off) (void);
+#endif	
+};
+enum msm_camera_csi_data_format {
+	CSI_8BIT,
+	CSI_10BIT,
+	CSI_12BIT,
+};
+struct msm_camera_csi_params {
+	enum msm_camera_csi_data_format data_format;
+	uint8_t lane_cnt;
+	uint8_t lane_assign;
+	uint8_t settle_cnt;
+	uint8_t dpcm_scheme;
 };
 
 #ifdef CONFIG_SENSORS_MT9T013
@@ -128,6 +148,7 @@ struct msm_camera_sensor_flash_led {
 
 struct msm_camera_sensor_flash_src {
 	int flash_sr_type;
+	int (*camera_flash)(int level);
 
 	union {
 		struct msm_camera_sensor_flash_pmic pmic_src;
@@ -145,6 +166,37 @@ struct msm_camera_sensor_flash_data {
 	struct msm_camera_sensor_flash_src *flash_src;
 };
 
+struct camera_led_info {
+	uint16_t enable;
+	uint16_t low_limit_led_state;
+	uint16_t max_led_current_ma;
+	uint16_t num_led_est_table;
+};
+
+struct camera_led_est {
+	uint16_t enable;
+	uint16_t led_state;
+	uint16_t current_ma;
+	uint16_t lumen_value;
+	uint16_t min_step;
+	uint16_t max_step;
+};
+
+struct camera_flash_info {
+	struct camera_led_info *led_info;
+	struct camera_led_est *led_est_table;
+};
+
+struct camera_flash_cfg {
+	int num_flash_levels;
+	int (*camera_flash)(int level);
+	uint16_t low_temp_limit;
+	uint16_t low_cap_limit;
+	uint16_t low_cap_limit_dual;
+	uint8_t postpone_led_mode;
+	struct camera_flash_info *flash_info;	
+};
+
 struct msm_camera_sensor_strobe_flash_data {
 	uint8_t flash_trigger;
 	uint8_t flash_charge; /* pin for charge */
@@ -154,6 +206,29 @@ struct msm_camera_sensor_strobe_flash_data {
 	spinlock_t spin_lock;
 	spinlock_t timer_lock;
 	int state;
+};
+
+struct msm_camera_rawchip_info {
+	int rawchip_reset;
+	int rawchip_intr0;
+	int rawchip_intr1;
+	uint8_t rawchip_spi_freq;
+	uint8_t rawchip_mclk_freq;
+	int (*camera_rawchip_power_on)(void);
+	int (*camera_rawchip_power_off)(void);
+	int (*rawchip_use_ext_1v2)(void);
+};
+
+enum rawchip_enable_type {
+	RAWCHIP_DISABLE,
+	RAWCHIP_ENABLE,
+	RAWCHIP_DXO_BYPASS,
+	RAWCHIP_MIPI_BYPASS,
+};
+
+enum hdr_mode_type {
+	NON_HDR_MODE,
+	HDR_MODE,
 };
 
 enum msm_camera_type {
@@ -166,6 +241,27 @@ enum msm_camera_type {
 enum msm_sensor_type {
 	BAYER_SENSOR,
 	YUV_SENSOR,
+};
+
+enum camera_vreg_type {
+	REG_LDO,
+	REG_VS,
+	REG_GPIO,
+};
+
+enum sensor_flip_mirror_info {
+	CAMERA_SENSOR_NONE,
+	CAMERA_SENSOR_MIRROR,
+	CAMERA_SENSOR_FLIP,
+	CAMERA_SENSOR_MIRROR_FLIP,
+};
+
+struct camera_vreg_t {
+	char *reg_name;
+	enum camera_vreg_type type;
+	int min_voltage;
+	int max_voltage;
+	int op_mode;
 };
 
 struct msm_gpio_set_tbl {
@@ -194,6 +290,8 @@ struct msm_camera_gpio_conf {
 	uint8_t camera_off_table_size;
 	uint32_t *camera_on_table;
 	uint8_t camera_on_table_size;
+	uint16_t *cam_gpio_tbl;
+	uint8_t cam_gpio_tbl_size;
 };
 
 enum msm_camera_i2c_mux_mode {
@@ -215,6 +313,13 @@ enum msm_camera_vreg_name_t {
 	CAM_VAF,
 };
 
+enum msm_camera_pixel_order_default {
+	MSM_CAMERA_PIXEL_ORDER_GR,
+	MSM_CAMERA_PIXEL_ORDER_RG,
+	MSM_CAMERA_PIXEL_ORDER_BG,
+	MSM_CAMERA_PIXEL_ORDER_GB,
+};
+
 struct msm_camera_sensor_platform_info {
 	int mount_angle;
 	int sensor_reset;
@@ -224,6 +329,14 @@ struct msm_camera_sensor_platform_info {
 	struct msm_camera_gpio_conf *gpio_conf;
 	struct msm_camera_i2c_conf *i2c_conf;
 	struct msm_camera_csi_lane_params *csi_lane_params;
+	int sensor_reset_enable;
+	int sensor_pwd;
+	int vcm_pwd;
+	int vcm_enable;
+	int privacy_light;
+	enum msm_camera_pixel_order_default pixel_order_default;	
+	enum sensor_flip_mirror_info mirror_flip;
+	void *privacy_light_info;
 };
 
 enum msm_camera_actuator_name {
@@ -244,14 +357,19 @@ struct msm_actuator_info {
 	int bus_id;
 	int vcm_pwd;
 	int vcm_enable;
+	int use_rawchip_af;
+	int otp_diviation;
 };
 
 struct msm_eeprom_info {
 	struct i2c_board_info const *board_info;
 	int bus_id;
-	int eeprom_reg_addr;
-	int eeprom_read_length;
-	int eeprom_i2c_slave_addr;
+};
+
+enum htc_camera_image_type_board {
+	HTC_CAMERA_IMAGE_NONE_BOARD,
+	HTC_CAMERA_IMAGE_YUSHANII_BOARD,
+	HTC_CAMERA_IMAGE_MAX_BOARD,
 };
 
 struct msm_camera_sensor_info {
@@ -276,6 +394,18 @@ struct msm_camera_sensor_info {
 	struct msm_actuator_info *actuator_info;
 	int pmic_gpio_enable;
 	struct msm_eeprom_info *eeprom_info;
+	struct msm_camera_gpio_conf *gpio_conf;
+	int (*camera_power_on)(void);
+	int (*camera_power_off)(void);
+	void (*camera_yushanii_probed)(enum htc_camera_image_type_board);
+	void (*camera_on_check_vcm)(void); 
+	enum htc_camera_image_type_board htc_image;	
+	int use_rawchip;
+	int hdr_mode;
+	int video_hdr_capability;
+	int power_down_disable; 
+	int mirror_mode;
+	struct camera_flash_cfg* flash_cfg;
 };
 
 struct msm_camera_board_info {
