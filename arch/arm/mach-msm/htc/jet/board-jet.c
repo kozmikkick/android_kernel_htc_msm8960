@@ -109,6 +109,10 @@
 #include <mach/mhl.h>
 #endif
 
+#ifdef CONFIG_MSM_CAMERA_FLASH
+#include <linux/htc_flashlight.h>
+#endif
+
 #include <mach/board_htc.h>
 #ifdef CONFIG_HTC_BATT_8960
 #include "mach/htc_battery_8960.h"
@@ -3428,7 +3432,9 @@ static void __init jet_init(void)
 	msm_uart_gsbi_gpio_init();
 	msm_region_id_gpio_init();
 	platform_add_devices(jet_devices, ARRAY_SIZE(jet_devices));
-	//jet_init_camera();
+#ifdef CONFIG_MSM_CAMERA
+	jet_init_camera();
+#endif
 	jet_init_mmc();
 	//	acpuclk_init(&acpuclk_8960_soc_data);
 	if ((system_rev < 1 && engineerid == 0) || (system_rev >= 1 && engineerid == 1)) {
