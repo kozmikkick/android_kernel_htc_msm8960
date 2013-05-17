@@ -372,6 +372,11 @@ enum htc_camera_image_type_board {
 	HTC_CAMERA_IMAGE_MAX_BOARD,
 };
 
+enum cam_vcm_onoff_type {
+       STATUS_OFF,
+       STATUS_ON,
+};
+
 struct msm_camera_sensor_info {
 	const char *sensor_name;
 	int sensor_reset_enable;
@@ -406,6 +411,7 @@ struct msm_camera_sensor_info {
 	int power_down_disable; 
 	int mirror_mode;
 	struct camera_flash_cfg* flash_cfg;
+	int sensor_cut;
 };
 
 struct msm_camera_board_info {
