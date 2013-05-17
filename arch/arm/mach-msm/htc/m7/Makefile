@@ -8,6 +8,9 @@ obj-$(CONFIG_MACH_M7_UL) += board-m7-keypad.o
 obj-$(CONFIG_MACH_M7_UL) += board-m7-rfkill.o
 obj-$(CONFIG_MACH_M7_UL) += board-m7-wifi.o
 obj-$(CONFIG_MACH_M7_UL) += board-m7-gpu.o
+ifeq ($(CONFIG_MSM_CAMERA),y)
+obj-$(CONFIG_MACH_M7_UL) += board-m7-camera.o
+endif
 obj-$(CONFIG_MACH_M7_UL) += display/
 CFLAGS_board-m7-display.o += -Idrivers/video
 obj-$(CONFIG_MACH_M7_UL) += ../htc_wifi_nvs.o
