@@ -3668,7 +3668,9 @@ static void __init elite_init(void)
 	msm_uart_gsbi_gpio_init();
 	msm_region_id_gpio_init();
 	platform_add_devices(elite_devices, ARRAY_SIZE(elite_devices));
-        //	elite_init_camera();
+#ifdef CONFIG_MSM_CAMERA
+        elite_init_camera();
+#endif
 	elite_init_mmc();
 	//	acpuclk_init(&acpuclk_8960_soc_data);
 	if ((engineerid & 0x03) == 1) {
