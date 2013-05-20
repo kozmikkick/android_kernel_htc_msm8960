@@ -24,6 +24,9 @@
 #include <sound/pcm.h>
 #include <sound/initval.h>
 #include <sound/control.h>
+#ifdef CONFIG_MACH_M7_UL
+#include <sound/q6adm.h>
+#endif
 #include <asm/dma.h>
 #include <linux/dma-mapping.h>
 #include <linux/android_pmem.h>
@@ -50,7 +53,12 @@ static struct snd_pcm_hardware msm_pcm_hardware = {
 				SNDRV_PCM_INFO_MMAP_VALID |
 				SNDRV_PCM_INFO_INTERLEAVED |
 				SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_RESUME),
+#ifdef CONFIG_MACH_M7_UL
+	.formats =              SNDRV_PCM_FMTBIT_S16_LE
+				| SNDRV_PCM_FMTBIT_S24_LE,
+#else
 	.formats =              SNDRV_PCM_FMTBIT_S16_LE,
+#endif
 	.rates =                SNDRV_PCM_RATE_8000_48000 | SNDRV_PCM_RATE_KNOT,
 	.rate_min =             8000,
 	.rate_max =             48000,
@@ -237,6 +245,9 @@ static int msm_pcm_playback_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct msm_audio *prtd = runtime->private_data;
 	int ret;
+#ifdef CONFIG_MACH_M7_UL
+	short bit_width = 16;
+#endif
 
 	pr_debug("%s\n", __func__);
 	prtd->pcm_size = snd_pcm_lib_buffer_bytes(substream);
@@ -249,8 +260,17 @@ static int msm_pcm_playback_prepare(struct snd_pcm_substream *substream)
 	if (prtd->enabled)
 		return 0;
 
+#ifdef CONFIG_MACH_M7_UL
+	if (runtime->format == SNDRV_PCM_FORMAT_S24_LE)
+		bit_width = 24;
+
+	ret = q6asm_media_format_block_pcm_format_support(
+				prtd->audio_client, runtime->rate,
+				runtime->channels, bit_width);
+#else
 	ret = q6asm_media_format_block_pcm(prtd->audio_client, runtime->rate,
 				runtime->channels);
+#endif
 	if (ret < 0)
 		pr_debug("%s: CMD Format block failed\n", __func__);
 
@@ -433,7 +453,11 @@ static int msm_pcm_open(struct snd_pcm_substream *substream)
 	atomic_set(&prtd->stop, 1);
 	runtime->private_data = prtd;
 	lpa_audio.prtd = prtd;
+#ifdef CONFIG_MACH_M7_UL
+	lpa_set_volume(lpa_audio.volume);
+#else
 	lpa_set_volume(0);
+#endif
 	ret = q6asm_set_softpause(lpa_audio.prtd->audio_client, &softpause);
 	if (ret < 0)
 		pr_err("%s: Send SoftPause Param failed ret=%d\n",
@@ -450,9 +474,13 @@ int lpa_set_volume(unsigned volume)
 {
 	int rc = 0;
 	if (lpa_audio.prtd && lpa_audio.prtd->audio_client) {
+#ifdef CONFIG_MACH_M7_UL
+		rc = q6asm_set_volume(lpa_audio.prtd->audio_client, volume);
+#else
 		rc = q6asm_set_lrgain(lpa_audio.prtd->audio_client,
 					(volume >> 16) & 0xFFFF,
 					volume & 0xFFFF);
+#endif
 		if (rc < 0) {
 			pr_err("%s: Send Volume command failed"
 					" rc=%d\n", __func__, rc);
@@ -657,6 +685,85 @@ static int msm_pcm_ioctl(struct snd_pcm_substream *substream,
 		}
 		pr_debug("Metadata mode not enabled\n");
 		return -EPERM;
+#ifdef CONFIG_MACH_M7_UL
+	case SNDRV_PCM_IOCTL1_ENABLE_EFFECT:
+	{
+		struct param {
+			uint32_t effect_type; 
+			uint32_t module_id;
+			uint32_t param_id;
+			uint32_t payload_size;
+		} q6_param;
+		void *payload;
+
+		pr_info("%s: SNDRV_PCM_IOCTL1_ENABLE_EFFECT\n", __func__);
+		if (copy_from_user(&q6_param, (void *) arg,
+					sizeof(q6_param))) {
+			pr_err("%s: copy param from user failed\n",
+				__func__);
+			return -EFAULT;
+		}
+
+		if (q6_param.payload_size <= 0 ||
+		    (q6_param.effect_type != 0 &&
+		     q6_param.effect_type != 1)) {
+			pr_err("%s: unsupported param: %d, 0x%x, 0x%x, %d\n",
+				__func__, q6_param.effect_type,
+				q6_param.module_id, q6_param.param_id,
+				q6_param.payload_size);
+			return -EINVAL;
+		}
+
+		payload = kzalloc(q6_param.payload_size, GFP_KERNEL);
+		if (!payload) {
+			pr_err("%s: failed to allocate memory\n",
+				__func__);
+			return -ENOMEM;
+		}
+		if (copy_from_user(payload, (void *) (arg + sizeof(q6_param)),
+			q6_param.payload_size)) {
+			pr_err("%s: copy payload from user failed\n",
+				__func__);
+			kfree(payload);
+			return -EFAULT;
+		}
+
+		if (q6_param.effect_type == 0) { 
+			if (!prtd->audio_client) {
+				pr_debug("%s: audio_client not found\n",
+					__func__);
+				kfree(payload);
+				return -EACCES;
+			}
+			rc = q6asm_enable_effect(prtd->audio_client,
+						q6_param.module_id,
+						q6_param.param_id,
+						q6_param.payload_size,
+						payload);
+			pr_info("%s: call q6asm_enable_effect, rc %d\n",
+				__func__, rc);
+		} else { 
+			int port_id = msm_pcm_routing_get_port(substream);
+			int index = afe_get_port_index(port_id);
+			pr_info("%s: use copp topology, port id %d, index %d\n",
+				__func__, port_id, index);
+			if (port_id < 0) {
+				pr_err("%s: invalid port_id %d\n",
+					__func__, port_id);
+			} else {
+				rc = q6adm_enable_effect(index,
+						     q6_param.module_id,
+						     q6_param.param_id,
+						     q6_param.payload_size,
+						     payload);
+				pr_info("%s: call q6adm_enable_effect, rc %d\n",
+					__func__, rc);
+			}
+		}
+		kfree(payload);
+		return rc;
+	}
+#endif
 	default:
 		break;
 	}

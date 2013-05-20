@@ -28,6 +28,9 @@
 #include <asm/dma.h>
 #include <linux/dma-mapping.h>
 #include <linux/android_pmem.h>
+#ifdef CONFIG_MACH_M7_UL
+#include <sound/pcm_params.h>
+#endif
 
 #include "msm-pcm-q6.h"
 #include "msm-pcm-routing.h"
@@ -73,7 +76,11 @@ static struct snd_pcm_hardware msm_pcm_hardware_playback = {
 				SNDRV_PCM_INFO_MMAP_VALID |
 				SNDRV_PCM_INFO_INTERLEAVED |
 				SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_RESUME),
+#ifdef CONFIG_MACH_M7_UL
+	.formats =              SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
+#else
 	.formats =              SNDRV_PCM_FMTBIT_S16_LE,
+#endif
 	.rates =                SNDRV_PCM_RATE_8000_48000 | SNDRV_PCM_RATE_KNOT,
 	.rate_min =             8000,
 	.rate_max =             48000,
@@ -241,6 +248,9 @@ static int msm_pcm_playback_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct msm_audio *prtd = runtime->private_data;
 	int ret;
+#ifdef CONFIG_MACH_M7_UL
+	short bit_width = 16;
+#endif
 
 	pr_debug("%s\n", __func__);
 	prtd->pcm_size = snd_pcm_lib_buffer_bytes(substream);
@@ -252,8 +262,17 @@ static int msm_pcm_playback_prepare(struct snd_pcm_substream *substream)
 	if (prtd->enabled)
 		return 0;
 
+#ifdef CONFIG_MACH_M7_UL
+	if (runtime->format == SNDRV_PCM_FORMAT_S24_LE)
+		bit_width = 24;
+
+	ret = q6asm_media_format_block_pcm_format_support(prtd->audio_client,
+				runtime->rate, runtime->channels, bit_width);
+#else
 	ret = q6asm_media_format_block_pcm(prtd->audio_client, runtime->rate,
 				runtime->channels);
+#endif
+
 	if (ret < 0)
 		pr_info("%s: CMD Format block failed\n", __func__);
 
@@ -310,6 +329,9 @@ static int msm_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	int ret = 0;
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct msm_audio *prtd = runtime->private_data;
+#ifdef CONFIG_MACH_M7_UL
+	struct snd_soc_pcm_runtime *soc_prtd = substream->private_data;
+#endif
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
@@ -320,11 +342,22 @@ static int msm_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 		pr_debug("SNDRV_PCM_TRIGGER_STOP\n");
+#ifdef CONFIG_MACH_M7_UL
+		pr_info("prtd->start %d substream->stream %d soc_prtd->dai_link->be_id 0x%x\n",atomic_read(&prtd->start),substream->stream,soc_prtd->dai_link->be_id);
+#endif
 		atomic_set(&prtd->start, 0);
 		if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
 			break;
+#ifdef CONFIG_MACH_M7_UL
+		if(msm_routing_check_backend_enabled(soc_prtd->dai_link->be_id)) {
+                    pr_info("%s:end eos\n",__func__);
+		    prtd->cmd_ack = 2; 
+		    q6asm_cmd_nowait(prtd->audio_client, CMD_EOS);
+                }
+#else
 		prtd->cmd_ack = 0;
 		q6asm_cmd_nowait(prtd->audio_client, CMD_EOS);
+#endif
 		break;
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
@@ -485,8 +518,14 @@ static int msm_pcm_playback_close(struct snd_pcm_substream *substream)
 	pr_debug("%s\n", __func__);
 
 	dir = IN;
+#ifdef CONFIG_MACH_M7_UL
+	if(msm_routing_check_backend_enabled(soc_prtd->dai_link->be_id) && prtd->cmd_ack == 2)
+		ret = wait_event_timeout(the_locks.eos_wait,
+				(prtd->cmd_ack == 1), 5 * HZ);
+#else
 	ret = wait_event_timeout(the_locks.eos_wait,
 				prtd->cmd_ack, 5 * HZ);
+#endif
 	if (ret < 0)
 		pr_err("%s: CMD_EOS failed\n", __func__);
 	q6asm_cmd(prtd->audio_client, CMD_CLOSE);
@@ -676,12 +715,38 @@ static int msm_pcm_hw_params(struct snd_pcm_substream *substream,
 	struct audio_buffer *buf;
 	int dir, ret;
 	int format = FORMAT_LINEAR_PCM;
+#ifdef CONFIG_MACH_M7_UL
+	short bit_width = 16;
+#endif
 	struct msm_pcm_routing_evt event;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		dir = IN;
 	else
 		dir = OUT;
+
+#ifdef CONFIG_MACH_M7_UL
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		if (params_format(params) == SNDRV_PCM_FORMAT_S24_LE)
+			bit_width = 24;
+		ret = q6asm_open_write_v2(prtd->audio_client,
+				FORMAT_LINEAR_PCM, bit_width);
+		if (ret < 0) {
+			pr_err("%s: q6asm_open_write_v2 failed\n", __func__);
+			q6asm_audio_client_free(prtd->audio_client);
+			kfree(prtd);
+			return -ENOMEM;
+		}
+
+		pr_debug("%s: session ID %d\n", __func__,
+			prtd->audio_client->session);
+		prtd->session_id = prtd->audio_client->session;
+		msm_pcm_routing_reg_phy_stream(soc_prtd->dai_link->be_id,
+			prtd->audio_client->perf_mode,
+			prtd->session_id, substream->stream);
+		prtd->cmd_ack = 1;
+	}
+#endif
 
 	/*capture path*/
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {

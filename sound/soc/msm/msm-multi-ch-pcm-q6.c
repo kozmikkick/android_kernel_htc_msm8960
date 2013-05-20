@@ -47,11 +47,19 @@ struct snd_msm_volume {
 static struct snd_msm_volume multi_ch_pcm_audio = {NULL, 0x2000};
 
 #define PLAYBACK_NUM_PERIODS		8
+#ifdef CONFIG_MACH_M7_UL
+#define PLAYBACK_MAX_PERIOD_SIZE	4032
+#else
 #define PLAYBACK_MAX_PERIOD_SIZE	12288
+#endif
 #define PLAYBACK_MIN_PERIOD_SIZE        256
 #define CAPTURE_NUM_PERIODS		16
 #define CAPTURE_MIN_PERIOD_SIZE		320
+#ifdef CONFIG_MACH_M7_UL
+#define CAPTURE_MAX_PERIOD_SIZE		5376
+#else
 #define CAPTURE_MAX_PERIOD_SIZE		12288
+#endif
 
 static struct snd_pcm_hardware msm_pcm_hardware_capture = {
 	.info =                 (SNDRV_PCM_INFO_MMAP |
@@ -79,12 +87,21 @@ static struct snd_pcm_hardware msm_pcm_hardware_playback = {
 				SNDRV_PCM_INFO_MMAP_VALID |
 				SNDRV_PCM_INFO_INTERLEAVED |
 				SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_RESUME),
+#ifdef CONFIG_MACH_M7_UL
+	.formats =              SNDRV_PCM_FMTBIT_S16_LE
+				| SNDRV_PCM_FMTBIT_S24_LE,
+#else
 	.formats =              SNDRV_PCM_FMTBIT_S16_LE,
+#endif
 	.rates =                SNDRV_PCM_RATE_8000_48000 | SNDRV_PCM_RATE_KNOT,
 	.rate_min =             8000,
 	.rate_max =             48000,
 	.channels_min =         1,
+#ifdef CONFIG_MACH_M7_UL
+	.channels_max =         6,
+#else
 	.channels_max =         8,
+#endif
 	.buffer_bytes_max =     PLAYBACK_NUM_PERIODS * PLAYBACK_MAX_PERIOD_SIZE,
 	.period_bytes_min =     PLAYBACK_MIN_PERIOD_SIZE,
 	.period_bytes_max =     PLAYBACK_MAX_PERIOD_SIZE,
@@ -252,6 +269,9 @@ static int msm_pcm_playback_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct msm_audio *prtd = runtime->private_data;
 	int ret;
+#ifdef CONFIG_MACH_M7_UL
+	short bit_width = 16;
+#endif
 
 	pr_debug("%s\n", __func__);
 	if (prtd->mmap_flag) {
@@ -270,8 +290,17 @@ static int msm_pcm_playback_prepare(struct snd_pcm_substream *substream)
 	if (prtd->enabled)
 		return 0;
 
+#ifdef CONFIG_MACH_M7_UL
+	if (runtime->format == SNDRV_PCM_FORMAT_S24_LE)
+		bit_width = 24;
+
+	ret = q6asm_media_format_block_multi_ch_pcm_format_support(
+			prtd->audio_client, runtime->rate, runtime->channels,
+			bit_width);
+#else
 	ret = q6asm_media_format_block_multi_ch_pcm(prtd->audio_client,
 			runtime->rate, runtime->channels);
+#endif
 	if (ret < 0)
 		pr_info("%s: CMD Format block failed\n", __func__);
 

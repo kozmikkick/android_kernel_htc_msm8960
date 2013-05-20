@@ -20,6 +20,9 @@
 #include <linux/clk.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
+#ifdef CONFIG_MACH_M7_UL
+#include <sound/pcm_params.h>
+#endif
 #include <sound/soc.h>
 #include <sound/apr_audio.h>
 #include <sound/q6afe.h>
@@ -152,6 +155,9 @@ static int msm_dai_q6_mi2s_hw_params(struct snd_pcm_substream *substream,
 		(substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
 		&mi2s_dai_data->rx_dai : &mi2s_dai_data->tx_dai);
 	struct msm_dai_q6_dai_data *dai_data = &mi2s_dai_config->mi2s_dai_data;
+#ifdef CONFIG_MACH_M7_UL
+	int bit_width = 16;
+#endif
 
 	dai_data->channels = params_channels(params);
 	switch (dai_data->channels) {
@@ -206,8 +212,22 @@ static int msm_dai_q6_mi2s_hw_params(struct snd_pcm_substream *substream,
 	default:
 		goto error_invalid_data;
 	}
+#ifdef CONFIG_MACH_M7_UL
+	switch (params_format(params)) {
+	case SNDRV_PCM_FORMAT_S16_LE:
+		bit_width = 16;
+		break;
+	case SNDRV_PCM_FORMAT_S24_LE:
+		bit_width = 24;
+		break;
+	}
+#endif
 	dai_data->rate = params_rate(params);
+#ifdef CONFIG_MACH_M7_UL
+	dai_data->port_config.mi2s.bitwidth = bit_width;
+#else
 	dai_data->port_config.mi2s.bitwidth = 16;
+#endif
 	dai_data->bitwidth = 16;
 	if (!mi2s_dai_data->rate_constraint.list) {
 		mi2s_dai_data->rate_constraint.list = &dai_data->rate;
@@ -461,6 +481,9 @@ static int msm_dai_q6_cdc_hw_params(struct snd_pcm_hw_params *params,
 				    struct snd_soc_dai *dai, int stream)
 {
 	struct msm_dai_q6_dai_data *dai_data = dev_get_drvdata(dai->dev);
+#ifdef CONFIG_MACH_M7_UL
+	int bit_width = 16;
+#endif
 
 	dai_data->channels = params_channels(params);
 	switch (dai_data->channels) {
@@ -482,8 +505,21 @@ static int msm_dai_q6_cdc_hw_params(struct snd_pcm_hw_params *params,
 	dev_dbg(dai->dev, " channel %d sample rate %d entered\n",
 	dai_data->channels, dai_data->rate);
 
+#ifdef CONFIG_MACH_M7_UL
+	switch (params_format(params)) {
+	case SNDRV_PCM_FORMAT_S16_LE:
+		bit_width = 16;
+		break;
+	case SNDRV_PCM_FORMAT_S24_LE:
+		bit_width = 24;
+		break;
+	}
+	
+	dai_data->port_config.mi2s.bitwidth = bit_width;
+#else
 	/* Q6 only supports 16 as now */
 	dai_data->port_config.mi2s.bitwidth = 16;
+#endif
 	dai_data->port_config.mi2s.line = 1;
 	return 0;
 }
@@ -511,12 +547,28 @@ static int msm_dai_q6_slim_bus_hw_params(struct snd_pcm_hw_params *params,
 				    struct snd_soc_dai *dai, int stream)
 {
 	struct msm_dai_q6_dai_data *dai_data = dev_get_drvdata(dai->dev);
+#ifdef CONFIG_MACH_M7_UL
+	int bit_width = 16;
+#endif
 
 	dai_data->channels = params_channels(params);
 	dai_data->rate = params_rate(params);
 
+#ifdef CONFIG_MACH_M7_UL
+	switch (params_format(params)) {
+	case SNDRV_PCM_FORMAT_S16_LE:
+		bit_width = 16;
+		break;
+	case SNDRV_PCM_FORMAT_S24_LE:
+		bit_width = 24;
+		break;
+	}
+	
+	dai_data->port_config.slim_sch.bit_width = bit_width;
+#else
 	/* Q6 only supports 16 as now */
 	dai_data->port_config.slim_sch.bit_width = 16;
+#endif
 	dai_data->port_config.slim_sch.data_format = 0;
 	dai_data->port_config.slim_sch.num_channels = dai_data->channels;
 	dai_data->port_config.slim_sch.reserved = 0;
@@ -640,6 +692,9 @@ static int msm_dai_q6_afe_rtproxy_hw_params(struct snd_pcm_hw_params *params,
 				struct snd_soc_dai *dai)
 {
 	struct msm_dai_q6_dai_data *dai_data = dev_get_drvdata(dai->dev);
+#ifdef CONFIG_MACH_M7_UL
+	int bit_width = 16;
+#endif
 
 	dai_data->rate = params_rate(params);
 	dai_data->port_config.rtproxy.num_ch =
@@ -648,7 +703,19 @@ static int msm_dai_q6_afe_rtproxy_hw_params(struct snd_pcm_hw_params *params,
 	pr_debug("channel %d entered,dai_id: %d,rate: %d\n",
 	dai_data->port_config.rtproxy.num_ch, dai->id, dai_data->rate);
 
+#ifdef CONFIG_MACH_M7_UL
+	switch (params_format(params)) {
+	case SNDRV_PCM_FORMAT_S16_LE:
+		bit_width = 16;
+		break;
+	case SNDRV_PCM_FORMAT_S24_LE:
+		bit_width = 24;
+		break;
+	}
+	dai_data->port_config.rtproxy.bitwidth = bit_width;
+#else
 	dai_data->port_config.rtproxy.bitwidth = 16; /* Q6 only supports 16 */
+#endif
 	dai_data->port_config.rtproxy.interleaved = 1;
 	dai_data->port_config.rtproxy.frame_sz = params_period_bytes(params);
 	dai_data->port_config.rtproxy.jitter =
@@ -1492,7 +1559,11 @@ static struct snd_soc_dai_driver msm_dai_q6_i2s_rx_dai = {
 	.playback = {
 		.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
 		SNDRV_PCM_RATE_16000,
+#ifdef CONFIG_MACH_M7_UL
+		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
+#else
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+#endif
 		.channels_min = 1,
 		.channels_max = 4,
 		.rate_min =     8000,
@@ -1567,7 +1638,11 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_rx_dai = {
 	.playback = {
 		.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
 		SNDRV_PCM_RATE_16000,
+#ifdef CONFIG_MACH_M7_UL
+		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
+#else
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+#endif
 		.channels_min = 1,
 		.channels_max = 2,
 		.rate_min =     8000,
@@ -1727,7 +1802,11 @@ static struct snd_soc_dai_driver msm_dai_q6_mi2s_dai = {
 	.playback = {
 		.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
 		SNDRV_PCM_RATE_16000,
+#ifdef CONFIG_MACH_M7_UL
+		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
+#else
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+#endif
 		.rate_min =     8000,
 		.rate_max =	48000,
 	},
@@ -1746,7 +1825,11 @@ static struct snd_soc_dai_driver msm_dai_q6_mi2s_dai = {
 static struct snd_soc_dai_driver msm_dai_q6_slimbus_1_rx_dai = {
 	.playback = {
 		.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000,
+#ifdef CONFIG_MACH_M7_UL
+		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
+#else
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+#endif
 		.channels_min = 1,
 		.channels_max = 1,
 		.rate_min = 8000,
@@ -1759,12 +1842,20 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_1_rx_dai = {
 
 static struct snd_soc_dai_driver msm_dai_q6_slimbus_1_tx_dai = {
 	.capture = {
+#ifdef CONFIG_MACH_M7_UL
+		.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
+#else
 		.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000,
+#endif
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 		.channels_min = 1,
 		.channels_max = 1,
 		.rate_min = 8000,
+#ifdef CONFIG_MACH_M7_UL
+		.rate_max = 48000,
+#else
 		.rate_max = 16000,
+#endif
 	},
 	.ops = &msm_dai_q6_ops,
 	.probe = msm_dai_q6_dai_probe,
