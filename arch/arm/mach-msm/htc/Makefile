@@ -25,6 +25,7 @@ obj-$(CONFIG_HTC_HEADSET_GPIO) += htc_headset_gpio.o
 obj-$(CONFIG_HTC_HEADSET_ONE_WIRE) += htc_headset_one_wire.o
 obj-$(CONFIG_HTC_HEADSET) += htc_headset.o
 obj-$(CONFIG_ARCH_MSM8960) += mdm2.o mdm_common.o
+obj-$(CONFIG_ARCH_MSM8960) += htc_acoustic_8960.o
 ifdef CONFIG_ARCH_APQ8064
 		obj-$(CONFIG_MSM_NATIVE_RESTART) += restart-apq8064.o
 endif
