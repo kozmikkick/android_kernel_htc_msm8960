@@ -59,6 +59,9 @@ enum {
 	MSM_FRONTEND_DAI_MULTIMEDIA5,
 	MSM_FRONTEND_DAI_MULTIMEDIA6,
 	MSM_FRONTEND_DAI_MULTIMEDIA7,
+#ifdef CONFIG_MACH_M7_UL
+	MSM_FRONTEND_DAI_MULTIMEDIA_STUB,
+#endif
 	MSM_FRONTEND_DAI_MULTIMEDIA8,
 	MSM_FRONTEND_DAI_CS_VOICE,
 	MSM_FRONTEND_DAI_VOIP,
@@ -114,6 +117,14 @@ enum msm_pcm_routing_event {
 	MSM_PCM_RT_EVT_DEVSWITCH,
 	MSM_PCM_RT_EVT_MAX,
 };
+
+#ifdef CONFIG_MACH_M7_UL
+struct msm_pcm_routing_ops {
+	int (*get_q6_effect) (void);
+};
+#endif
+
+
 /* dai_id: front-end ID,
  * dspst_id:  DSP audio stream ID
  * stream_type: playback or capture
@@ -134,6 +145,10 @@ void msm_pcm_routing_reg_phy_stream_v2(int fedai_id, bool perf_mode,
 
 void msm_pcm_routing_dereg_phy_stream(int fedai_id, int stream_type);
 
+#ifdef CONFIG_MACH_M7_UL
+int msm_pcm_routing_get_port(struct snd_pcm_substream *substream);
+#endif
+
 int lpa_set_volume(unsigned volume);
 
 int msm_routing_check_backend_enabled(int fedai_id);
@@ -141,5 +156,10 @@ int msm_routing_check_backend_enabled(int fedai_id);
 int multi_ch_pcm_set_volume(unsigned volume);
 
 int compressed_set_volume(unsigned volume);
+
+#ifdef CONFIG_MACH_M7_UL
+int compressed2_set_volume(unsigned volume);
+void htc_register_pcm_routing_ops(struct msm_pcm_routing_ops *ops);
+#endif
 
 #endif /*_MSM_PCM_H*/

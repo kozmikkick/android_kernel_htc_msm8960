@@ -1597,7 +1597,18 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 	}
 
 	list_for_each_entry(w, &card->widgets, list) {
+#ifdef CONFIG_MACH_M7_UL
+	switch (w->id) {
+		case snd_soc_dapm_pre:
+		case snd_soc_dapm_post:
+			break;
+		default:
+			list_del_init(&w->dirty);
+			break;
+	} 
+#else
 		list_del_init(&w->dirty);
+#endif
 
 		if (w->power) {
 			d = w->dapm;

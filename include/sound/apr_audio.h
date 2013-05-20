@@ -574,6 +574,24 @@ struct adm_multi_ch_copp_open_command {
 	u32 rate;
 	u8 dev_channel_mapping[8];
 } __packed;
+
+#ifdef CONFIG_MACH_M7_UL
+#define ADM_CMD_MULTI_CHANNEL_COPP_OPEN_V2		 0x00010319
+
+struct adm_multi_ch_copp_open_command_v2 {
+	struct apr_hdr hdr;
+	u16 flags;
+	u16 mode; 
+	u16 endpoint_id1;
+	u16 endpoint_id2;
+	u32 topology_id;
+	u16 channel_config;
+	u16 bit_width;
+	u32 rate;
+	u8 dev_channel_mapping[8];
+} __packed;
+#endif
+
 #define ADM_CMD_MEMORY_MAP				0x00010C30
 struct adm_cmd_memory_map{
 	struct apr_hdr	hdr;
@@ -617,6 +635,11 @@ struct adm_cmd_memory_unmap_regions{
 #define VPM_TX_SM_ECNS_COPP_TOPOLOGY			0x00010F71
 #define VPM_TX_DM_FLUENCE_COPP_TOPOLOGY			0x00010F72
 #define VPM_TX_QMIC_FLUENCE_COPP_TOPOLOGY		0x00010F75
+#ifdef CONFIG_MACH_M7_UL
+#define HTC_STEREO_RECORD_TOPOLOGY			0x10000000
+#define HTC_COPP_TOPOLOGY				0x10000001
+#define HTC_POPP_TOPOLOGY				0x10000002
+#endif
 
 #define LOWLATENCY_POPP_TOPOLOGY			0x00010C68
 #define LOWLATENCY_COPP_TOPOLOGY			0x00010312
@@ -1188,6 +1211,9 @@ struct asm_stream_cmd_open_read_compressed {
 } __packed;
 
 #define ASM_STREAM_CMD_OPEN_WRITE                        0x00010BCA
+#ifdef CONFIG_MACH_M7_UL
+#define ASM_STREAM_CMD_OPEN_WRITE_V2                     0x00010D8F
+#endif
 #define ASM_STREAM_CMD_OPEN_WRITE_V2_1                   0x00010DB1
 struct asm_stream_cmd_open_write {
 	struct apr_hdr hdr;
@@ -1197,6 +1223,17 @@ struct asm_stream_cmd_open_write {
 	u32            post_proc_top;
 	u32            format;
 } __attribute__((packed));
+
+#ifdef CONFIG_MACH_M7_UL
+struct asm_stream_cmd_open_write_v2 {
+	struct apr_hdr hdr;
+	u32            uMode;
+	u16            sink_endpoint;
+	u16            bits_per_sample;
+	u32            post_proc_top;
+	u32            format;
+} __packed;
+#endif
 
 #define IEC_61937_MASK	0x00000001
 #define IEC_60958_MASK	0x00000002

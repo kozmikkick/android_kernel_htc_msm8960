@@ -208,6 +208,9 @@ int srs_trumedia_open(int port_id, int srs_tech_id, void *srs_params)
 	open->hdr.src_port = port_id;
 	open->hdr.dest_svc = APR_SVC_ADM;
 	open->hdr.dest_domain = APR_DOMAIN_ADSP;
+#ifdef CONFIG_MACH_M7_UL
+	index = afe_get_port_index(port_id);
+#endif
 	open->hdr.dest_port = atomic_read(&this_adm.copp_id[index]);
 	open->hdr.token = port_id;
 	open->hdr.opcode = ADM_CMD_SET_PARAMS;
@@ -344,6 +347,74 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 	}
 	return 0;
 }
+
+#ifdef CONFIG_MACH_M7_UL
+int q6adm_enable_effect(int port_id, uint32_t module_id, uint32_t param_id,
+		uint32_t payload_size, void *payload)
+{
+	void *q6_cmd = NULL;
+	void *data = NULL;
+	struct asm_pp_params_command *cmd = NULL;
+	int ret = 0, sz = 0;
+
+	pr_info("%s: param_id 0x%x, payload size %d\n",
+			__func__, param_id, payload_size);
+	sz = sizeof(struct asm_pp_params_command) + payload_size;
+	q6_cmd = kzalloc(sz, GFP_KERNEL);
+	if (q6_cmd == NULL) {
+		pr_err("%s[%d]: Mem alloc failed\n",
+			   __func__, port_id);
+		return -ENOMEM;
+	}
+
+	cmd = (struct asm_pp_params_command *)q6_cmd;
+	cmd->payload = NULL;
+	cmd->payload_size = sizeof(struct asm_pp_param_data_hdr) + payload_size;
+
+	cmd->params.module_id = module_id;
+	cmd->params.param_id = param_id;
+	cmd->params.param_size = payload_size;
+	cmd->params.reserved = 0;
+
+	cmd->hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+	cmd->hdr.pkt_size = sz;
+	cmd->hdr.src_svc = APR_SVC_ADM;
+	cmd->hdr.src_domain = APR_DOMAIN_APPS;
+	cmd->hdr.src_port = port_id;
+	cmd->hdr.dest_svc = APR_SVC_ADM;
+	cmd->hdr.dest_domain = APR_DOMAIN_ADSP;
+	cmd->hdr.dest_port = atomic_read(&this_adm.copp_id[port_id]);
+	cmd->hdr.token = port_id;
+	cmd->hdr.opcode = ADM_CMD_SET_PARAMS;
+
+	data = (u8 *)(q6_cmd + sizeof(struct asm_pp_params_command));
+	memcpy(data, payload, payload_size);
+
+	ret = apr_send_pkt(this_adm.apr, (uint32_t *)q6_cmd);
+	if (ret < 0) {
+		pr_err("%s: ADM enable for port %d failed\n",
+			__func__, port_id);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+	ret = wait_event_timeout(this_adm.wait,
+		atomic_read(&this_adm.copp_stat[port_id]),
+		msecs_to_jiffies(TIMEOUT_MS));
+	if (!ret) {
+		pr_err("%s: ADM open failed for port %d\n",
+			__func__, port_id);
+		ret = -EINVAL;
+		goto fail_cmd;
+	}
+	ret = 0;
+
+fail_cmd:
+	kfree(q6_cmd);
+	pr_info("%s: return %d\n", __func__, ret);
+	return ret;
+}
+#endif
 
 static int send_adm_cal_block(int port_id, struct acdb_cal_block *aud_cal)
 {
@@ -881,6 +952,157 @@ fail_cmd:
 	return ret;
 }
 
+#ifdef CONFIG_MACH_M7_UL
+int adm_multi_ch_copp_open_v2(int port_id, int path, int rate, int channel_mode,
+				int topology, uint16_t bit_width)
+{
+	struct adm_multi_ch_copp_open_command_v2 open;
+	int ret = 0;
+	int index;
+
+	pr_debug("%s: port %d path:%d rate:%d channel :%d\n", __func__,
+				port_id, path, rate, channel_mode);
+
+	port_id = afe_convert_virtual_to_portid(port_id);
+
+	if (afe_validate_port(port_id) < 0) {
+		pr_err("%s port idi[%d] is invalid\n", __func__, port_id);
+		return -ENODEV;
+	}
+
+	index = afe_get_port_index(port_id);
+	pr_debug("%s: Port ID %d, index %d\n", __func__, port_id, index);
+
+	if (this_adm.apr == NULL) {
+		this_adm.apr = apr_register("ADSP", "ADM", adm_callback,
+						0xFFFFFFFF, &this_adm);
+		if (this_adm.apr == NULL) {
+			pr_err("%s: Unable to register ADM\n", __func__);
+			ret = -ENODEV;
+			return ret;
+		}
+		rtac_set_adm_handle(this_adm.apr);
+	}
+
+	
+	if (atomic_read(&this_adm.copp_cnt[index]) == 0) {
+
+		open.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
+				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
+
+		open.hdr.pkt_size =
+			sizeof(struct adm_multi_ch_copp_open_command_v2);
+
+		open.hdr.opcode = ADM_CMD_MULTI_CHANNEL_COPP_OPEN_V2;
+		pr_debug("%s Performance mode", __func__);
+
+		memset(open.dev_channel_mapping, 0, 8);
+
+		if (channel_mode == 1)	{
+			open.dev_channel_mapping[0] = PCM_CHANNEL_FC;
+		} else if (channel_mode == 2) {
+			open.dev_channel_mapping[0] = PCM_CHANNEL_FL;
+			open.dev_channel_mapping[1] = PCM_CHANNEL_FR;
+		} else if (channel_mode == 4) {
+			open.dev_channel_mapping[0] = PCM_CHANNEL_FL;
+			open.dev_channel_mapping[1] = PCM_CHANNEL_FR;
+			open.dev_channel_mapping[2] = PCM_CHANNEL_RB;
+			open.dev_channel_mapping[3] = PCM_CHANNEL_LB;
+		} else if (channel_mode == 6) {
+			open.dev_channel_mapping[0] = PCM_CHANNEL_FL;
+			open.dev_channel_mapping[1] = PCM_CHANNEL_FR;
+			open.dev_channel_mapping[2] = PCM_CHANNEL_LFE;
+			open.dev_channel_mapping[3] = PCM_CHANNEL_FC;
+			open.dev_channel_mapping[4] = PCM_CHANNEL_LB;
+			open.dev_channel_mapping[5] = PCM_CHANNEL_RB;
+		} else if (channel_mode == 8) {
+			open.dev_channel_mapping[0] = PCM_CHANNEL_FL;
+			open.dev_channel_mapping[1] = PCM_CHANNEL_FR;
+			open.dev_channel_mapping[2] = PCM_CHANNEL_LFE;
+			open.dev_channel_mapping[3] = PCM_CHANNEL_FC;
+			open.dev_channel_mapping[4] = PCM_CHANNEL_LB;
+			open.dev_channel_mapping[5] = PCM_CHANNEL_RB;
+			open.dev_channel_mapping[6] = PCM_CHANNEL_FLC;
+			open.dev_channel_mapping[7] = PCM_CHANNEL_FRC;
+		} else {
+			pr_err("%s invalid num_chan %d\n", __func__,
+					channel_mode);
+			return -EINVAL;
+		}
+		open.hdr.src_svc = APR_SVC_ADM;
+		open.hdr.src_domain = APR_DOMAIN_APPS;
+		open.hdr.src_port = port_id;
+		open.hdr.dest_svc = APR_SVC_ADM;
+		open.hdr.dest_domain = APR_DOMAIN_ADSP;
+		open.hdr.dest_port = port_id;
+		open.hdr.token = port_id;
+
+		open.mode = path;
+		open.endpoint_id1 = port_id;
+
+		if (this_adm.ec_ref_rx == 0) {
+			open.endpoint_id2 = 0xFFFF;
+		} else if (this_adm.ec_ref_rx && (path != 1)) {
+				open.endpoint_id2 = this_adm.ec_ref_rx;
+				this_adm.ec_ref_rx = 0;
+		}
+
+		pr_debug("%s open.endpoint_id1:%d open.endpoint_id2:%d",
+			__func__, open.endpoint_id1, open.endpoint_id2);
+		
+		if (path == ADM_PATH_PLAYBACK)
+			open.topology_id = get_adm_rx_topology();
+		else {
+			open.topology_id = get_adm_tx_topology();
+			if ((open.topology_id ==
+				VPM_TX_SM_ECNS_COPP_TOPOLOGY) ||
+			    (open.topology_id ==
+				VPM_TX_DM_FLUENCE_COPP_TOPOLOGY))
+				rate = 16000;
+		}
+
+		if (open.topology_id  == 0)
+			open.topology_id = topology;
+
+		open.channel_config = channel_mode & 0x00FF;
+		open.bit_width = bit_width;
+		open.rate  = rate;
+
+		pr_debug("%s: channel_config=%d port_id=%d\n",
+			__func__, open.channel_config,
+			open.endpoint_id1);
+		pr_debug("%s: rate=%d topology_id=0x%X\n",
+			__func__, open.rate, open.topology_id);
+
+		atomic_set(&this_adm.copp_stat[index], 0);
+
+		ret = apr_send_pkt(this_adm.apr, (uint32_t *)&open);
+		if (ret < 0) {
+			pr_err("%s:ADM enable for port %d failed\n",
+						__func__, port_id);
+			ret = -EINVAL;
+			goto fail_cmd;
+		}
+		
+		ret = wait_event_timeout(this_adm.wait,
+			atomic_read(&this_adm.copp_stat[index]),
+			msecs_to_jiffies(TIMEOUT_MS));
+		if (!ret) {
+			pr_err("%s ADM open failed for port %d\n", __func__,
+								port_id);
+			ret = -EINVAL;
+			goto fail_cmd;
+		}
+	}
+	atomic_inc(&this_adm.copp_cnt[index]);
+	return 0;
+
+fail_cmd:
+
+	return ret;
+}
+#endif
+
 int adm_matrix_map(int session_id, int path, int num_copps,
 			unsigned int *port_id, int copp_id)
 {
@@ -912,6 +1134,9 @@ int adm_matrix_map(int session_id, int path, int num_copps,
 	route.hdr.opcode = ADM_CMD_MATRIX_MAP_ROUTINGS;
 	route.num_sessions = 1;
 	route.session[0].id = session_id;
+#ifdef CONFIG_MACH_M7_UL
+	route.session[0].num_copps = num_copps;
+#endif
 
 	if (num_copps < ADM_MAX_COPPS) {
 		copp_cnt = num_copps;

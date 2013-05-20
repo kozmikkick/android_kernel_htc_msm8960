@@ -166,6 +166,12 @@ struct audio_client {
 	bool             perf_mode;
 };
 
+#ifdef CONFIG_MACH_M7_UL
+struct q6asm_ops {
+	int (*get_q6_effect) (void);
+};
+#endif
+
 void q6asm_audio_client_free(struct audio_client *ac);
 
 struct audio_client *q6asm_audio_client_alloc(app_cb cb, void *priv);
@@ -192,6 +198,10 @@ int q6asm_open_read_compressed(struct audio_client *ac,
 			 uint32_t frames_per_buffer, uint32_t meta_data_mode);
 
 int q6asm_open_write(struct audio_client *ac, uint32_t format);
+#ifdef CONFIG_MACH_M7_UL
+int q6asm_open_write_v2(struct audio_client *ac, uint32_t format,
+						uint16_t bit_width);
+#endif
 
 int q6asm_open_write_compressed(struct audio_client *ac, uint32_t format);
 
@@ -289,8 +299,19 @@ int q6asm_enc_cfg_blk_amrwb(struct audio_client *ac, uint32_t frames_per_buf,
 int q6asm_media_format_block_pcm(struct audio_client *ac,
 			uint32_t rate, uint32_t channels);
 
+#ifdef CONFIG_MACH_M7_UL
+int q6asm_media_format_block_pcm_format_support(struct audio_client *ac,
+			uint32_t rate, uint32_t channels, uint16_t bit_width);
+#endif
+
 int q6asm_media_format_block_multi_ch_pcm(struct audio_client *ac,
 				uint32_t rate, uint32_t channels);
+
+#ifdef CONFIG_MACH_M7_UL
+int q6asm_media_format_block_multi_ch_pcm_format_support(
+		struct audio_client *ac, uint32_t rate, uint32_t channels,
+		uint16_t bit_width);
+#endif
 
 int q6asm_media_format_block_aac(struct audio_client *ac,
 			struct asm_aac_cfg *cfg);
@@ -340,5 +361,13 @@ int q6asm_get_apr_service_id(int session_id);
 /* Common format block without any payload
 */
 int q6asm_media_format_block(struct audio_client *ac, uint32_t format);
+
+#ifdef CONFIG_MACH_M7_UL
+int q6asm_enable_effect(struct audio_client *ac, uint32_t module_id,
+			uint32_t param_id, uint32_t payload_size,
+			void *payload);
+
+void htc_register_q6asm_ops(struct q6asm_ops *ops);
+#endif
 
 #endif /* __Q6_ASM_H__ */

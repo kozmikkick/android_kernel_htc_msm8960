@@ -29,6 +29,11 @@ int adm_open(int port, int path, int rate, int mode, int topology);
 int adm_multi_ch_copp_open(int port, int path, int rate, int mode,
 				int topology, int perfmode);
 
+#ifdef CONFIG_MACH_M7_UL
+int adm_multi_ch_copp_open_v2(int port, int path, int rate, int mode,
+			int topology, uint16_t bit_width);
+#endif
+
 int adm_memory_map_regions(uint32_t *buf_add, uint32_t mempool_id,
 				uint32_t *bufsz, uint32_t bufcnt);
 
@@ -47,6 +52,11 @@ void adm_ec_ref_rx_id(int  port_id);
 
 #ifdef CONFIG_RTAC
 int adm_get_copp_id(int port_id);
+#endif
+
+#ifdef CONFIG_MACH_M7_UL
+int q6adm_enable_effect(int port_id, uint32_t module_id, uint32_t param_id,
+		uint32_t payload_size, void *payload);
 #endif
 
 #endif /* __Q6_ADM_H__ */
