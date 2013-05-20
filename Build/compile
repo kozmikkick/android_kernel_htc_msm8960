@@ -1,0 +1,34 @@
+# compile the kernel
+cd ..
+export CROSS_COMPILE=arm-eabi- ARCH=arm SUBARM=arm
+make -j8 kozmik_defconfig
+make -j8
+
+# copy modules
+find arch -type f -name '*.ko' -exec cp -f {} Build/KozmiKKernel/modules \;
+find block -type f -name '*.ko' -exec cp -f {} Build/KozmiKKernel/modules \;
+find crypto -type f -name '*.ko' -exec cp -f {} Build/KozmiKKernel/modules \;
+find drivers -type f -name '*.ko' -exec cp -f {} Build/KozmiKKernel/modules \;
+find fs -type f -name '*.ko' -exec cp -f {} Build/KozmiKKernel/modules \;
+find ipc -type f -name '*.ko' -exec cp -f {} Build/KozmiKKernel/modules \;
+find net -type f -name '*.ko' -exec cp -f {} Build/KozmiKKernel/modules \;
+
+####Building sense boot.img Start####
+cd Build
+cd ..
+
+# copy zImage
+cp -f arch/arm/boot/zImage Build/KozmiKKernel/kernel/zImage
+
+cd Build
+
+# compile install zip
+cd KozmiKKernel
+zip -r ./KozmiKKernel.zip ./META-INF ./modules ./kernel
+
+# cleaning up
+cd ..
+rm -fR ./KozmiKKernel/kernel/zImage
+rm -fR ./KozmiKKernel/modules
+mkdir ./KozmiKKernel/modules
+rm -fR ./zImage.new
