@@ -34,6 +34,156 @@ static struct platform_device msm_camera_server = {
 	.id = 0,
 };
 
+static struct gpiomux_setting cam_settings[11] = {
+	{
+		.func = GPIOMUX_FUNC_GPIO, 
+		.drv = GPIOMUX_DRV_8MA,
+		.pull = GPIOMUX_PULL_DOWN,
+		.dir = GPIOMUX_IN,
+	},
+
+	{
+		.func = GPIOMUX_FUNC_1, 
+		.drv = GPIOMUX_DRV_8MA,
+		.pull = GPIOMUX_PULL_NONE,
+	},
+
+	{
+		.func = GPIOMUX_FUNC_GPIO, 
+		.drv = GPIOMUX_DRV_8MA,
+		.pull = GPIOMUX_PULL_NONE,
+		.dir = GPIOMUX_OUT_LOW,
+	},
+
+	{
+		.func = GPIOMUX_FUNC_1, 
+		.drv = GPIOMUX_DRV_8MA,
+		.pull = GPIOMUX_PULL_NONE,
+	},
+
+	{
+		.func = GPIOMUX_FUNC_2, 
+		.drv = GPIOMUX_DRV_8MA,
+		.pull = GPIOMUX_PULL_NONE,
+	},
+
+	{
+		.func = GPIOMUX_FUNC_GPIO, 
+		.drv = GPIOMUX_DRV_4MA,
+		.pull = GPIOMUX_PULL_DOWN,
+		.dir = GPIOMUX_IN,
+	},
+
+	{
+		.func = GPIOMUX_FUNC_2, 
+		.drv = GPIOMUX_DRV_2MA,
+		.pull = GPIOMUX_PULL_NONE,
+	},
+
+	{
+		.func = GPIOMUX_FUNC_GPIO, 
+		.drv = GPIOMUX_DRV_2MA,
+		.pull = GPIOMUX_PULL_NONE,
+		.dir = GPIOMUX_IN,
+	},
+
+	{
+		.func = GPIOMUX_FUNC_GPIO, 
+		.drv = GPIOMUX_DRV_2MA,
+		.pull = GPIOMUX_PULL_DOWN,
+		.dir = GPIOMUX_IN,
+	},
+
+	{
+		.func = GPIOMUX_FUNC_GPIO, 
+		.drv = GPIOMUX_DRV_2MA,
+		.pull = GPIOMUX_PULL_NONE,
+		.dir = GPIOMUX_OUT_HIGH,
+	},
+
+	{
+		.func = GPIOMUX_FUNC_GPIO, 
+		.drv = GPIOMUX_DRV_2MA,
+		.pull = GPIOMUX_PULL_NONE,
+		.dir = GPIOMUX_OUT_LOW,
+	},
+
+};
+
+static struct msm_gpiomux_config elite_cam_configs[] = {
+	{
+		.gpio = ELITE_GPIO_CAM_MCLK1,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cam_settings[4], 
+			[GPIOMUX_SUSPENDED] = &cam_settings[2], 
+		},
+	},
+	{
+		.gpio = ELITE_GPIO_CAM_MCLK0,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cam_settings[1], 
+			[GPIOMUX_SUSPENDED] = &cam_settings[2], 
+		},
+	},
+	{
+		.gpio = ELITE_GPIO_CAM_I2C_DAT,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cam_settings[3], 
+			[GPIOMUX_SUSPENDED] = &cam_settings[0],
+		},
+	},
+	{
+		.gpio = ELITE_GPIO_CAM_I2C_CLK,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cam_settings[3], 
+			[GPIOMUX_SUSPENDED] = &cam_settings[0],
+		},
+	},
+	{
+		.gpio = ELITE_GPIO_RAW_INTR0,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cam_settings[7], 
+			[GPIOMUX_SUSPENDED] = &cam_settings[8], 
+		},
+	},
+	{
+		.gpio = ELITE_GPIO_RAW_INTR1,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cam_settings[7], 
+			[GPIOMUX_SUSPENDED] = &cam_settings[8], 
+		},
+	},
+	
+	{
+		.gpio      = ELITE_GPIO_MCAM_SPI_CLK,
+		.settings = {
+			[GPIOMUX_ACTIVE] = &cam_settings[4], 
+			[GPIOMUX_SUSPENDED] = &cam_settings[2], 
+		},
+	},
+	{
+		.gpio      = ELITE_GPIO_MCAM_SPI_CS0,
+		.settings = {
+			[GPIOMUX_ACTIVE] = &cam_settings[6], 
+			[GPIOMUX_SUSPENDED] = &cam_settings[10], 
+		},
+	},
+	{
+		.gpio      = ELITE_GPIO_MCAM_SPI_DI,
+		.settings = {
+			[GPIOMUX_ACTIVE] = &cam_settings[4], 
+			[GPIOMUX_SUSPENDED] = &cam_settings[0], 
+		},
+	},
+	{
+		.gpio      = ELITE_GPIO_MCAM_SPI_DO,
+		.settings = {
+			[GPIOMUX_ACTIVE] = &cam_settings[4], 
+			[GPIOMUX_SUSPENDED] = &cam_settings[2], 
+		},
+	},
+};
+
 #ifdef CONFIG_MSM_CAMERA
 static struct msm_bus_vectors cam_init_vectors[] = {
 	{
@@ -1295,6 +1445,9 @@ void __init elite_init_camera(void)
 {
 
 	pr_info("%s", __func__);
+
+	msm_gpiomux_install(elite_cam_configs,
+			ARRAY_SIZE(elite_cam_configs));
 
 	config_cam_id(1); 
 	msleep(2);
