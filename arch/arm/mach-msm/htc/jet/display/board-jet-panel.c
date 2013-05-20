@@ -640,6 +640,9 @@ void __init jet_init_fb(void)
 	platform_device_register(&wfd_panel_device);
 	platform_device_register(&wfd_device);
 #endif
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+  platform_device_register(&hdmi_msm_device);
+#endif
         platform_device_register(&mipi_dsi_jet_panel_device);
         msm_fb_register_device("mdp", &mdp_pdata);
         msm_fb_register_device("mipi_dsi", &mipi_dsi_pdata);
