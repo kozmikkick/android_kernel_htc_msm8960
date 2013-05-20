@@ -1217,7 +1217,7 @@ static void msmfb_early_resume(struct early_suspend *h)
 }
 #endif
 
-static int unset_bl_level, bl_updated;
+static int unset_bl_level = 128, bl_updated;
 static int bl_level_old;
 
 static int mdp_bl_scale_config(struct msm_fb_data_type *mfd,
