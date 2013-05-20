@@ -71,6 +71,9 @@ struct sitar_codec_dai_data {
 	u32 *ch_num;
 	u32 ch_act;
 	u32 ch_tot;
+#ifdef CONFIG_MACH_M7_UL 
+	u32 bit_width;
+#endif
 	u32 ch_mask;
 	wait_queue_head_t dai_wait;
 };
@@ -3284,7 +3287,11 @@ static int sitar_codec_enable_slimrx(struct snd_soc_dapm_widget *w,
 			ret = wcd9xxx_cfg_slim_sch_rx(sitar,
 					sitar_p->dai[j].ch_num,
 					sitar_p->dai[j].ch_tot,
+#ifdef CONFIG_MACH_M7_UL
+					sitar_p->dai[j].rate, 16);
+#else
 					sitar_p->dai[j].rate);
+#endif
 		}
 		break;
 	case SND_SOC_DAPM_POST_PMD:
