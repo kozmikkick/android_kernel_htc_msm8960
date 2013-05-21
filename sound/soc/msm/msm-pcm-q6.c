@@ -44,8 +44,12 @@ struct snd_msm {
 
 #define PLAYBACK_NUM_PERIODS	8
 #define PLAYBACK_PERIOD_SIZE	2048
+#ifdef CONFIG_MACH_M7_UL
+#define CAPTURE_NUM_PERIODS	2
+#else
 #define CAPTURE_MIN_NUM_PERIODS 2
 #define CAPTURE_MAX_NUM_PERIODS 16
+#endif
 #define CAPTURE_MAX_PERIOD_SIZE 4096
 #define CAPTURE_MIN_PERIOD_SIZE 320
 
@@ -61,12 +65,20 @@ static struct snd_pcm_hardware msm_pcm_hardware_capture = {
 	.rate_max =             48000,
 	.channels_min =         1,
 	.channels_max =         4,
+#ifdef CONFIG_MACH_M7_UL
+	.buffer_bytes_max =     CAPTURE_NUM_PERIODS * CAPTURE_MAX_PERIOD_SIZE,
+	.period_bytes_min =	CAPTURE_MIN_PERIOD_SIZE,
+	.period_bytes_max =     CAPTURE_MAX_PERIOD_SIZE,
+	.periods_min =          CAPTURE_NUM_PERIODS,
+	.periods_max =          CAPTURE_NUM_PERIODS,
+#else
 	.buffer_bytes_max =     CAPTURE_MAX_NUM_PERIODS *
 				CAPTURE_MAX_PERIOD_SIZE,
 	.period_bytes_min =	CAPTURE_MIN_PERIOD_SIZE,
 	.period_bytes_max =     CAPTURE_MAX_PERIOD_SIZE,
 	.periods_min =          CAPTURE_MIN_NUM_PERIODS,
 	.periods_max =          CAPTURE_MAX_NUM_PERIODS,
+#endif
 	.fifo_size =            0,
 };
 
@@ -99,7 +111,11 @@ static unsigned int supported_sample_rates[] = {
 	8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000
 };
 
+#ifdef CONFIG_MACH_M7_UL
+static uint32_t in_frame_info[CAPTURE_NUM_PERIODS][2];
+#else
 static uint32_t in_frame_info[CAPTURE_MAX_NUM_PERIODS][2];
+#endif
 
 static struct snd_pcm_hw_constraint_list constraints_sample_rates = {
 	.count = ARRAY_SIZE(supported_sample_rates),
@@ -376,7 +392,9 @@ static int msm_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 static int msm_pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
+#ifndef CONFIG_MACH_M7_UL
 	struct snd_soc_pcm_runtime *soc_prtd = substream->private_data;
+#endif
 	struct msm_audio *prtd;
 	int ret = 0;
 
@@ -397,6 +415,7 @@ static int msm_pcm_open(struct snd_pcm_substream *substream)
 	prtd->audio_client->perf_mode = false;
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		runtime->hw = msm_pcm_hardware_playback;
+#ifndef CONFIG_MACH_M7_UL
 		ret = q6asm_open_write(prtd->audio_client, FORMAT_LINEAR_PCM);
 		if (ret < 0) {
 			pr_err("%s: pcm out open failed\n", __func__);
@@ -412,7 +431,7 @@ static int msm_pcm_open(struct snd_pcm_substream *substream)
 			prtd->audio_client->perf_mode,
 			prtd->session_id, substream->stream);
 		prtd->cmd_ack = 1;
-
+#endif
 	}
 	/* Capture path */
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
@@ -434,8 +453,13 @@ static int msm_pcm_open(struct snd_pcm_substream *substream)
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		ret = snd_pcm_hw_constraint_minmax(runtime,
 			SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
+#ifdef CONFIG_MACH_M7_UL
+			CAPTURE_NUM_PERIODS * CAPTURE_MIN_PERIOD_SIZE,
+			CAPTURE_NUM_PERIODS * CAPTURE_MAX_PERIOD_SIZE);
+#else
 			CAPTURE_MIN_NUM_PERIODS * CAPTURE_MIN_PERIOD_SIZE,
 			CAPTURE_MAX_NUM_PERIODS * CAPTURE_MAX_PERIOD_SIZE);
+#endif
 		if (ret < 0) {
 			pr_err("constraint for buffer bytes min max ret = %d\n",
 									ret);

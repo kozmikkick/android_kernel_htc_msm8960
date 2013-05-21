@@ -20,6 +20,9 @@
 #include <mach/qdsp6v2/audio_acdb.h>
 #include <sound/apr_audio.h>
 #include <sound/q6afe.h>
+#ifdef CONFIG_MACH_M7_UL
+#include <linux/delay.h>
+#endif
 
 struct afe_ctl {
 	void *apr;
@@ -617,6 +620,9 @@ int afe_open(u16 port_id, union afe_port_config *afe_config, int rate)
 {
 	struct afe_port_start_command start;
 	struct afe_audioif_config_command config;
+#ifdef CONFIG_MACH_M7_UL
+	static int  if_first_open = 1;
+#endif
 	int ret = 0;
 
 	if (!afe_config) {
@@ -637,6 +643,15 @@ int afe_open(u16 port_id, union afe_port_config *afe_config, int rate)
 	ret = afe_q6_interface_prepare();
 	if (ret != 0)
 		return ret;
+
+#ifdef CONFIG_MACH_M7_UL
+        if(if_first_open)
+        {
+                msleep(100);
+                if_first_open = 0;
+                pr_info("%s: First afe_open ",__func__);
+        }
+#endif
 
 	config.hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
 				APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);

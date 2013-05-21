@@ -902,6 +902,9 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 		case ASM_STREAM_CMD_OPEN_READ:
 		case ASM_STREAM_CMD_OPEN_READ_V2_1:
 		case ASM_STREAM_CMD_OPEN_WRITE:
+#ifdef CONFIG_MACH_M7_UL
+		case ASM_STREAM_CMD_OPEN_WRITE_V2:
+#endif
 		case ASM_STREAM_CMD_OPEN_WRITE_V2_1:
 		case ASM_STREAM_CMD_OPEN_READWRITE:
 		case ASM_STREAM_CMD_OPEN_LOOPBACK:
@@ -1512,6 +1515,9 @@ int q6asm_open_write(struct audio_client *ac, uint32_t format)
 {
 	int rc = 0x00;
 	struct asm_stream_cmd_open_write open;
+#ifdef CONFIG_MACH_M7_UL
+	static int  if_first_open_write = 0;
+#endif
 
 	if ((ac == NULL) || (ac->apr == NULL)) {
 		pr_err("%s: APR handle NULL\n", __func__);
@@ -1520,6 +1526,13 @@ int q6asm_open_write(struct audio_client *ac, uint32_t format)
 	pr_debug("%s: session[%d] wr_format[0x%x]", __func__, ac->session,
 		format);
 
+#ifdef CONFIG_MACH_M7_UL
+        if(!if_first_open_write)
+		{
+			msleep(30);
+			if_first_open_write = 1;
+		}
+#endif
 	q6asm_add_hdr(ac, &open.hdr, sizeof(open), TRUE);
 
 	if (ac->perf_mode) {

@@ -208,9 +208,6 @@ int srs_trumedia_open(int port_id, int srs_tech_id, void *srs_params)
 	open->hdr.src_port = port_id;
 	open->hdr.dest_svc = APR_SVC_ADM;
 	open->hdr.dest_domain = APR_DOMAIN_ADSP;
-#ifdef CONFIG_MACH_M7_UL
-	index = afe_get_port_index(port_id);
-#endif
 	open->hdr.dest_port = atomic_read(&this_adm.copp_id[index]);
 	open->hdr.token = port_id;
 	open->hdr.opcode = ADM_CMD_SET_PARAMS;
@@ -318,6 +315,9 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 		switch (data->opcode) {
 		case ADM_CMDRSP_COPP_OPEN:
 		case ADM_CMDRSP_MULTI_CHANNEL_COPP_OPEN:
+#ifdef CONFIG_MACH_M7_UL
+		case ADM_CMDRSP_MULTI_CHANNEL_COPP_OPEN_V2:
+#endif
 		case ADM_CMDRSP_MULTI_CHANNEL_COPP_OPEN_V3: {
 			struct adm_copp_open_respond *open = data->payload;
 			if (open->copp_id == INVALID_COPP_ID) {
@@ -838,15 +838,19 @@ int adm_multi_ch_copp_open(int port_id, int path, int rate, int channel_mode,
 		open.hdr.pkt_size =
 			sizeof(struct adm_multi_ch_copp_open_command);
 
+#ifndef CONFIG_MACH_M7_UL
 		if (perfmode) {
 			pr_debug("%s Performance mode", __func__);
 			open.hdr.opcode = ADM_CMD_MULTI_CHANNEL_COPP_OPEN_V3;
 			open.flags = ADM_MULTI_CH_COPP_OPEN_PERF_MODE_BIT;
 			open.reserved = PCM_BITS_PER_SAMPLE;
 		} else {
+#endif
 			open.hdr.opcode = ADM_CMD_MULTI_CHANNEL_COPP_OPEN;
 			open.reserved = 0;
+#ifndef CONFIG_MACH_M7_UL
 		}
+#endif
 
 		memset(open.dev_channel_mapping, 0, 8);
 

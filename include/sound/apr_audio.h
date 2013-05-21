@@ -772,6 +772,9 @@ struct adm_copp_open_respond {
 } __attribute__ ((packed));
 
 #define ADM_CMDRSP_MULTI_CHANNEL_COPP_OPEN               0x00010311
+#ifdef CONFIG_MACH_M7_UL
+#define ADM_CMDRSP_MULTI_CHANNEL_COPP_OPEN_V2            0x0001031A
+#endif
 #define ADM_CMDRSP_MULTI_CHANNEL_COPP_OPEN_V3            0x00010334
 
 

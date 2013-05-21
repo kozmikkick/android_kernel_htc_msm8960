@@ -429,7 +429,11 @@ static int msm_pcm_open(struct snd_pcm_substream *substream)
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		runtime->hw = msm_pcm_hardware_capture;
 		ret = q6asm_open_read(prtd->audio_client,
+#ifdef CONFIG_MACH_M7_UL
+				FORMAT_LINEAR_PCM);
+#else
 				FORMAT_MULTI_CHANNEL_LINEAR_PCM);
+#endif
 		if (ret < 0) {
 			pr_err("%s: pcm in open failed\n", __func__);
 			q6asm_audio_client_free(prtd->audio_client);
