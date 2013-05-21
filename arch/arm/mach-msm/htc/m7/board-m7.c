@@ -52,6 +52,7 @@
 #include <mach/msm_spi.h>
 #include "timer.h"
 #include "devices.h"
+#include <sound/msm-dai-q6.h>
 #include <mach/gpio.h>
 #include <mach/gpiomux.h>
 #include <mach/rpm.h>
@@ -4246,6 +4247,19 @@ static struct platform_device m7_device_rpm_regulator __devinitdata = {
 	},
 };
 
+struct msm_mi2s_pdata mi2s_data = {
+	.rx_sd_lines = MSM_MI2S_SD0 ,   
+	.tx_sd_lines = MSM_MI2S_SD3 ,   
+};
+
+struct platform_device m7_cpudai_mi2s = {
+	.name	= "msm-dai-q6-mi2s",
+	.id	= -1,
+	.dev = {
+		.platform_data = &mi2s_data,
+	},
+};
+
 static struct platform_device *common_devices[] __initdata = {
 	&apq8064_device_acpuclk,
 	&apq8064_device_dmov,
@@ -4311,41 +4325,33 @@ static struct platform_device *common_devices[] __initdata = {
 	&apq_pcm_routing,
 	&apq_cpudai0,
 	&apq_cpudai1,
-        &apq_cpudai_pri_i2s_rx,
-        &apq_cpudai_pri_i2s_tx,
-	&mpq_cpudai_sec_i2s_rx,
-	&mpq_cpudai_mi2s_tx,
 	&apq_cpudai_hdmi_rx,
 	&apq_cpudai_bt_rx,
 	&apq_cpudai_bt_tx,
 	&apq_cpudai_fm_rx,
 	&apq_cpudai_fm_tx,
-	&apq_cpudai_slim_4_rx,
-	&apq_cpudai_slim_4_tx,
 	&apq_cpu_fe,
 	&apq_stub_codec,
 	&apq_voice,
 	&apq_voip,
 	&apq_lpa_pcm,
-	&apq_compr_dsp,
-	&apq_multi_ch_pcm,
-        &apq_lowlatency_pcm,
 	&apq_pcm_hostless,
 	&apq_cpudai_afe_01_rx,
 	&apq_cpudai_afe_01_tx,
 	&apq_cpudai_afe_02_rx,
 	&apq_cpudai_afe_02_tx,
 	&apq_pcm_afe,
+	&apq_cpudai_pri_i2s_rx,
+	&apq_cpudai_pri_i2s_tx,
 	&apq_cpudai_auxpcm_rx,
 	&apq_cpudai_auxpcm_tx,
 	&apq_cpudai_stub,
 	&apq_cpudai_slimbus_1_rx,
 	&apq_cpudai_slimbus_1_tx,
-        &apq_cpudai_slimbus_2_rx,
 	&apq_cpudai_slimbus_2_tx,
 	&apq_cpudai_slimbus_3_rx,
-	&apq_cpudai_slimbus_3_tx,
-
+	&apq_cpudai_slim_4_rx,
+	&apq_cpudai_slim_4_tx,
 	&apq8064_rpm_device,
 	&apq8064_rpm_log_device,
 	&apq8064_rpm_stat_device,
@@ -4386,15 +4392,18 @@ static struct platform_device *common_devices[] __initdata = {
 #ifdef CONFIG_MSM_CACHE_ERP
 	&apq8064_device_cache_erp,
 #endif
+	&apq_compr_dsp,
+	&apq_multi_ch_pcm,
 };
 
 static struct platform_device *cdp_devices[] __initdata = {
 	&apq8064_device_uart_gsbi1,
-        &apq8064_device_uart_gsbi2,
+	&apq8064_device_uart_gsbi2,
 #ifdef CONFIG_SERIAL_CIR
 	&apq8064_device_uart_gsbi3, 
 #endif
 	&apq8064_device_uart_gsbi7,
+	&m7_cpudai_mi2s,
 	&msm_device_sps_apq8064,
 };
 
